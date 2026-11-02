@@ -3,8 +3,10 @@ Nessun input passa dalla shell: yt-dlp e' usato come libreria."""
 import os
 import pathlib
 import re
+import subprocess
 import tempfile
 
+import numpy as np
 import yt_dlp
 from faster_whisper import WhisperModel
 
@@ -38,7 +40,13 @@ def transcribe(url: str, cookie_file: str | None, model_box: list) -> str:
             path = ydl.prepare_filename(info)
         if not model_box:
             model_box.append(WhisperModel("small", device="cpu", compute_type="int8"))
-        segs, meta = model_box[0].transcribe(path, vad_filter=True, beam_size=5)
+        raw = subprocess.run(
+            ["ffmpeg", "-nostdin", "-loglevel", "error", "-i", path,
+             "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
+            check=True, capture_output=True,
+        ).stdout
+        audio = np.frombuffer(raw, dtype=np.float32)
+        segs, meta = model_box[0].transcribe(audio, vad_filter=True, beam_size=5)
         lines = [f"[{ts(s.start)}] {s.text.strip()}" for s in segs]
     author = info.get("uploader") or info.get("channel") or "Video"
     return "\n".join([
