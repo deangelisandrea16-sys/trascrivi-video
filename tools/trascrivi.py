@@ -37,7 +37,10 @@ def transcribe(url: str, cookie_file: str | None, model_box: list) -> str:
             opts["cookiefile"] = cookie_file
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            path = ydl.prepare_filename(info)
+        files = [p for p in pathlib.Path(tmp).iterdir() if p.is_file()]
+        if not files:
+            raise RuntimeError("download non riuscito")
+        path = str(max(files, key=lambda p: p.stat().st_size))
         if not model_box:
             model_box.append(WhisperModel("small", device="cpu", compute_type="int8"))
         raw = subprocess.run(
