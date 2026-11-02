@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trascrivi Video</title>
+<meta name="description" content="Trascrizione di video (Reel Instagram e altri) in testo, direttamente nel browser con Whisper. Il file non lascia il dispositivo.">
+<meta name="theme-color" content="#0f0f12">
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--fg:#17171a;--muted:#6b6b73;--line:#e3e1dc;--acc:#d6336c;--acc2:#f59f00;--ok:#2b8a3e;--err:#c92a2a}
+@media (prefers-color-scheme:dark){:root{--bg:#0f0f12;--card:#18181c;--fg:#ececf0;--muted:#9a9aa3;--line:#2a2a30}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:1.6rem;margin:0 0 4px;letter-spacing:-.02em}
+h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);margin:0 0 20px;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:28px 12px;text-align:center;cursor:pointer;transition:border-color .15s}
+.drop.over,.drop:hover{border-color:var(--acc)}
+.drop strong{display:block;margin-bottom:4px}
+.drop small{color:var(--muted)}
+input[type=file]{display:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.row>label{flex:1 1 150px;font-size:.85rem;color:var(--muted)}
+select{width:100%;margin-top:4px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit}
+.chk{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:.9rem}
+button{font:inherit;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;background:var(--fg);color:var(--bg);font-weight:600}
+button.sec{background:transparent;color:var(--fg);border:1px solid var(--line);font-weight:500}
+button:disabled{opacity:.45;cursor:not-allowed}
+#go{width:100%;margin-top:14px;background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff}
+#file-name{margin-top:10px;font-size:.9rem;color:var(--muted);word-break:break-all}
+.bar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .2s}
+#status{font-size:.9rem;color:var(--muted)}
+#status.err{color:var(--err)}#status.ok{color:var(--ok)}
+textarea{width:100%;min-height:240px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:15px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical}
+.hidden{display:none}
+details{font-size:.9rem;color:var(--muted)}
+details summary{cursor:pointer;color:var(--fg)}
+details li{margin:4px 0}
+h2{font-size:1rem;margin:0 0 10px}
+input[type=url]{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit;margin-bottom:10px}
+#send{width:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff}
+.hint{font-size:.85rem;color:var(--muted);margin:10px 0 0}
+#link-status.err{color:var(--err)}#link-status.ok{color:var(--ok)}
+#archive a{display:block;padding:8px 0;border-top:1px solid var(--line);color:var(--fg);text-decoration:none;word-break:break-all}
+#archive a:first-child{border-top:0}
+footer{text-align:center;font-size:.8rem;color:var(--muted);margin-top:24px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Trascrivi <span>Video</span></h1>
+  <p class="sub">Reel, video e audio → testo. Da link (trascrive GitHub Actions) o da file (trascrive il tuo browser, offline).</p>
+
+  <section class="card">
+    <h2>Da link</h2>
+    <input type="url" id="link" placeholder="https://www.instagram.com/reel/…" inputmode="url" autocomplete="off">
+    <button id="send">Trascrivi dal link</button>
+    <p class="hint">Si apre GitHub con la richiesta già pronta: tocca <b>Commit changes</b> e torna qui. In 1–3 minuti il testo compare sotto.</p>
+    <div id="link-status" class="hint"></div>
+  </section>
+
+  <section class="card">
+    <h2>Archivio</h2>
+    <div id="archive" class="hint">Caricamento…</div>
+  </section>
+
+  <section class="card">
+    <h2>Da file (offline, nel browser)</h2>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Scegli un video">
+      <strong>Tocca per scegliere un video</strong>
+      <small>o trascinalo qui · MP4, MOV, M4A, MP3, WAV</small>
+    </div>
+    <input type="file" id="file" accept="video/*,audio/*">
+    <div id="file-name"></div>
+
+    <div class="row">
+      <label>Lingua
+        <select id="lang">
+          <option value="italian" selected>Italiano</option>
+          <option value="english">Inglese</option>
+          <option value="spanish">Spagnolo</option>
+          <option value="french">Francese</option>
+          <option value="german">Tedesco</option>
+          <option value="portuguese">Portoghese</option>
+          <option value="">Rileva automaticamente</option>
+        </select>
+      </label>
+      <label>Qualità
+        <select id="model">
+          <option value="onnx-community/whisper-base" selected>Veloce (base, ~80 MB)</option>
+          <option value="onnx-community/whisper-small">Precisa (small, ~250 MB)</option>
+        </select>
+      </label>
+    </div>
+    <label class="chk"><input type="checkbox" id="ts" checked> Includi timestamp (serve per i sottotitoli .srt)</label>
+
+    <button id="go" disabled>Trascrivi</button>
+  </section>
+
+  <section class="card hidden" id="progress">
+    <div id="status">Preparazione…</div>
+    <div class="bar"><i id="bar"></i></div>
+  </section>
+
+  <section class="card hidden" id="result">
+    <textarea id="out" spellcheck="false"></textarea>
+    <div class="row">
+      <button class="sec" id="copy">Copia</button>
+      <button class="sec" id="dl-txt">Scarica .txt</button>
+      <button class="sec" id="dl-srt">Scarica .srt</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>Come prendere un Reel da Instagram</summary>
+      <ul>
+        <li><b>Reel tuoi:</b> nel Reel → ⋯ → <i>Scarica</i> (o Impostazioni → Archivio).</li>
+        <li><b>Reel di altri con download attivo:</b> icona condividi → <i>Scarica</i>.</li>
+        <li><b>Altrimenti:</b> registrazione schermo del telefono, poi carica qui il file.</li>
+        <li>La prima trascrizione scarica il modello (una volta sola, poi resta in cache).</li>
+      </ul>
+    </details>
+  </section>
+
+  <footer>Whisper (OpenAI) via Transformers.js · elaborazione 100% locale</footer>
+</main>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const drop = $('drop'), fileIn = $('file'), go = $('go');
+let file = null, chunks = [], worker = null;
+
+// ---- Modalità link (GitHub Actions) ----
+const OWNER = 'deangelisandrea16-sys', REPO = 'trascrivi-video';
+const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents`;
+const LINK_RE = /^https:\/\/([a-z0-9-]+\.)*(instagram\.com|tiktok\.com|youtube\.com|youtu\.be|facebook\.com|fb\.watch|x\.com|twitter\.com|vimeo\.com)\/\S+$/i;
+let pollTimer = null;
+
+function linkStatus(msg, cls = '') { const s = $('link-status'); s.textContent = msg; s.className = 'hint ' + cls; }
+function showText(text) {
+  $('out').value = text; $('result').classList.remove('hidden');
+  chunks = []; $('dl-srt').disabled = true;
+  $('result').scrollIntoView({ behavior: 'smooth' });
+}
+async function fetchTranscript(id) {
+  const r = await fetch(`${API}/trascrizioni/${id}.md?t=${Date.now()}`, { headers: { Accept: 'application/vnd.github.raw' } });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(r.status === 403 ? 'limite richieste GitHub, riprova tra poco' : 'HTTP ' + r.status);
+  return r.text();
+}
+function poll(id, started = Date.now()) {
+  clearTimeout(pollTimer);
+  const wait = Math.round((Date.now() - started) / 1000);
+  if (wait > 600) return linkStatus('Ancora niente dopo 10 minuti: controlla la scheda Actions del repo.', 'err');
+  fetchTranscript(id).then(t => {
+    if (t) {
+      try { localStorage.removeItem('pending'); } catch {}
+      const bad = t.startsWith('ERRORE');
+      linkStatus(bad ? t : 'Fatto ✓', bad ? 'err' : 'ok');
+      showText(t); loadArchive();
+    } else {
+      linkStatus(`In attesa della trascrizione… ${wait}s (id ${id})`);
+      pollTimer = setTimeout(() => poll(id, started), 15000);
+    }
+  }).catch(e => { linkStatus('Errore: ' + e.message, 'err'); pollTimer = setTimeout(() => poll(id, started), 30000); });
+}
+$('send').onclick = () => {
+  const url = $('link').value.trim();
+  if (!LINK_RE.test(url)) return linkStatus('Incolla un link valido (Instagram, TikTok, YouTube…).', 'err');
+  const id = new Date().toISOString().replace(/\D/g, '').slice(0, 14) + '-' + Math.random().toString(36).slice(2, 6);
+  const q = new URLSearchParams({ filename: `richieste/${id}.txt`, value: url, message: `Richiesta ${id}` });
+  window.open(`https://github.com/${OWNER}/${REPO}/new/main?${q}`, '_blank', 'noopener');
+  try { localStorage.setItem('pending', id); } catch {}
+  history.replaceState(null, '', '?id=' + id);
+  poll(id);
+};
+async function loadArchive() {
+  const box = $('archive');
+  try {
+    const r = await fetch(`${API}/trascrizioni?t=${Date.now()}`);
+    const list = r.ok ? (await r.json()).filter(f => f.name.endsWith('.md')).reverse() : [];
+    box.textContent = '';
+    if (!list.length) { box.textContent = 'Nessuna trascrizione ancora.'; return; }
+    for (const f of list.slice(0, 30)) {
+      const id = f.name.slice(0, -3), a = document.createElement('a');
+      a.href = '?id=' + encodeURIComponent(id);
+      a.textContent = id.replace(/^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)\d*-.*/, '$3/$2/$1 $4:$5 UTC');
+      a.onclick = e => { e.preventDefault(); history.replaceState(null, '', a.href); fetchTranscript(id).then(t => t && showText(t)); };
+      box.appendChild(a);
+    }
+  } catch { box.textContent = 'Archivio non disponibile.'; }
+}
+
+const pick = f => {
+  if (!f) return;
+  if (!/^(video|audio)\//.test(f.type) && !/\.(mp4|mov|m4a|mp3|wav|webm|ogg|aac)$/i.test(f.name)) {
+    return setStatus('Formato non supportato.', 'err', true);
+  }
+  file = f;
+  $('file-name').textContent = `${f.name} · ${(f.size / 1048576).toFixed(1)} MB`;
+  go.disabled = false;
+};
+drop.onclick = () => fileIn.click();
+drop.onkeydown = e => (e.key === 'Enter' || e.key === ' ') && fileIn.click();
+fileIn.onchange = () => pick(fileIn.files[0]);
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => pick(e.dataTransfer.files[0]));
+
+function setStatus(msg, cls = '', show = true) {
+  $('progress').classList.toggle('hidden', !show);
+  const s = $('status'); s.textContent = msg; s.className = cls;
+}
+const setBar = p => $('bar').style.width = `${Math.max(0, Math.min(100, p))}%`;
+
+async function decodeAudio(f) {
+  const buf = await f.arrayBuffer();
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx({ sampleRate: 16000 });
+  try {
+    const audio = await ctx.decodeAudioData(buf);
+    if (audio.numberOfChannels === 1) return audio.getChannelData(0);
+    const a = audio.getChannelData(0), b = audio.getChannelData(1), m = new Float32Array(a.length);
+    for (let i = 0; i < a.length; i++) m[i] = (a[i] + b[i]) / 2;
+    return m;
+  } finally { ctx.close(); }
+}
+
+go.onclick = async () => {
+  if (!file) return;
+  go.disabled = true; $('result').classList.add('hidden'); setBar(0);
+  try {
+    setStatus('Estrazione audio dal video…');
+    const audio = await decodeAudio(file);
+    if (!audio.length) throw new Error('Nessuna traccia audio trovata.');
+    worker ??= new Worker('./worker.js', { type: 'module' });
+    worker.onmessage = onMsg;
+    worker.onerror = e => fail(e.message || 'Errore nel worker');
+    worker.postMessage({
+      audio, model: $('model').value, language: $('lang').value || null,
+      timestamps: $('ts').checked
+    }, [audio.buffer]);
+  } catch (e) { fail(e.message || String(e)); }
+};
+
+function onMsg({ data: d }) {
+  if (d.type === 'loading') { setStatus(`Download modello: ${d.file} ${d.progress ? Math.round(d.progress) + '%' : ''}`); setBar(d.progress || 0); }
+  else if (d.type === 'ready') { setStatus(`Trascrizione in corso (${d.device === 'webgpu' ? 'GPU' : 'CPU'})… può richiedere un po'.`); setBar(100); }
+  else if (d.type === 'done') {
+    chunks = d.chunks || [];
+    $('out').value = $('ts').checked && chunks.length
+      ? chunks.map(c => `[${fmt(c.timestamp[0], false)}] ${c.text.trim()}`).join('\n')
+      : d.text.trim();
+    $('result').classList.remove('hidden');
+    $('dl-srt').disabled = !chunks.length;
+    setStatus('Fatto ✓', 'ok'); go.disabled = false;
+  }
+  else if (d.type === 'error') fail(d.message);
+}
+function fail(m) { setStatus('Errore: ' + m, 'err'); go.disabled = false; }
+
+function fmt(s, srt = true) {
+  s = Math.max(0, s || 0);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = Math.floor(s % 60), ms = Math.round((s % 1) * 1000);
+  const p = (n, l = 2) => String(n).padStart(l, '0');
+  return srt ? `${p(h)}:${p(m)}:${p(sec)},${p(ms, 3)}` : (h ? `${h}:` : '') + `${p(m)}:${p(sec)}`;
+}
+const base = () => (file?.name || 'trascrizione').replace(/\.[^.]+$/, '');
+function save(text, ext, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = `${base()}.${ext}`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('copy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('out').value); $('copy').textContent = 'Copiato ✓'; }
+  catch { $('out').select(); document.execCommand('copy'); }
+  setTimeout(() => $('copy').textContent = 'Copia', 1500);
+};
+$('dl-txt').onclick = () => save($('out').value, 'txt', 'text/plain;charset=utf-8');
+$('dl-srt').onclick = () => save(chunks.map((c, i) => {
+  const [a, b] = c.timestamp; return `${i + 1}\n${fmt(a)} --> ${fmt(b ?? a + 2)}\n${c.text.trim()}\n`;
+}).join('\n'), 'srt', 'application/x-subrip;charset=utf-8');
+
+{
+  let id = new URLSearchParams(location.search).get('id');
+  if (!id) { try { id = localStorage.getItem('pending'); } catch {} }
+  if (id && /^[A-Za-z0-9_-]{1,80}$/.test(id)) poll(id);
+  loadArchive();
+}
+</script>
+</body>
+</html>
