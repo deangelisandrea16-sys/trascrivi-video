@@ -31,7 +31,7 @@ def transcribe(url: str, cookie_file: str | None, model_box: list) -> str:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "match_filter": yt_dlp.utils.match_filter_func(f"duration < {MAX_SEC}"),
+            "match_filter": yt_dlp.utils.match_filter_func(f"duration <? {MAX_SEC}"),
         }
         if cookie_file:
             opts["cookiefile"] = cookie_file
@@ -39,7 +39,7 @@ def transcribe(url: str, cookie_file: str | None, model_box: list) -> str:
             info = ydl.extract_info(url, download=True)
         files = [p for p in pathlib.Path(tmp).iterdir() if p.is_file()]
         if not files:
-            raise RuntimeError("download non riuscito")
+            raise RuntimeError("download non riuscito (video oltre 15 min o non disponibile)")
         path = str(max(files, key=lambda p: p.stat().st_size))
         if not model_box:
             model_box.append(WhisperModel("small", device="cpu", compute_type="int8"))
